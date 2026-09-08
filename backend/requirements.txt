@@ -1,5 +1,6 @@
 fastapi
-uvicorn[standard]
-sqlalchemy
-pydantic-settings
+uvicorn
 python-multipart
+opencv-python
+ultralytics
+numpy

@@ -1,22 +1,62 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Jansuraksha AI - Border CCTV</title>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-</head><body class="bg-black"><div id="root"></div>
-<script type="text/babel">
-function App(){
-  const [count,setCount]=React.useState(null); const [status,setStatus]=React.useState(""); const [img,setImg]=React.useState(null); const [loading,setLoading]=React.useState(false); const [mode,setMode]=React.useState("image");
-  const handleFile=async(e)=>{
-    const file=e.target.files[0]; if(!file) return; setLoading(true);
-    const fd=new FormData(); fd.append("file",file);
-    const url = mode==="image"? "http://127.0.0.1:8000/analyze-image" : "http://127.0.0.1:8000/analyze-video";
-    try{ const res=await fetch(url,{method:"POST",body:fd}); const data=await res.json(); setCount(data.people_count); setStatus(data.status); setImg(data.border_image); } catch(err){ alert("Backend 8000 pe on rakho!"); } setLoading(false);
-  }
-  return(<div className="min-h-screen bg-black text-white p-6"><h1 className="text-3xl font-black">JANSURAKSHA AI - BORDER CCTV</h1><p className="text-gray-400 mb-4">Image + Video | Exact Count with Tiling | Border Alert &gt;10 = RED</p>
-  <div className="flex gap-4 mb-6"><button onClick={()=>setMode("image")} className={`px-6 py-2 rounded-full ${mode==="image"?"bg-white text-black":"bg-zinc-800"}`}>Image Mode</button><button onClick={()=>setMode("video")} className={`px-6 py-2 rounded-full ${mode==="video"?"bg-white text-black":"bg-zinc-800"}`}>Video (CCTV) Mode</button></div>
-  <div className="grid md:grid-cols-2 gap-6"><div className="bg-zinc-900 p-6 rounded-2xl"><h2 className="mb-3">Upload {mode==="image"?"Image":"CCTV Video"}</h2><input type="file" accept={mode==="image"?"image/*":"video/*"} onChange={handleFile} className="bg-zinc-800 p-3 rounded w-full"/><div className="mt-4">{img && <img src={img} className="rounded-xl w-full border-2 border-red-600"/>}</div></div>
-  <div className="bg-zinc-900 p-6 rounded-2xl"><h2>Live Result</h2>{loading?<p className="text-yellow-400 animate-pulse mt-6">Analysing border footage... tiling se exact count nikal raha hai...</p>:count!==null?<><div className="text-7xl font-black mt-4">{count}</div><div className={`mt-4 inline-block px-5 py-2 rounded-full font-bold text-xl ${count>10?"bg-red-600 animate-pulse":"bg-green-600"}`}>{status}</div><p className="text-sm text-gray-400 mt-4">Border pe &gt;10 log = Breach Alert</p></>:<p className="text-gray-500 mt-6">File upload kar</p>}</div></div></div>)
+<!DOCTYPE html>
+<html>
+<head>
+<title>Jansuraksha AI</title>
+<style>
+body{background:#0a0a0a;color:white;font-family:sans-serif;padding:20px}
+.box{background:#1a1a1a;border:1px solid #333;padding:20px;border-radius:12px;margin-bottom:20px}
+button{background:#00ff88;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer}
+#result{margin-top:15px}
+img{max-width:100%;border:2px solid #00ff88;margin-top:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<h1>🛡️ JANSURAKSHA AI - Border CCTV</h1>
+<p>Backend: <span style="color:#00ff88">http://127.0.0.1:8000 - CONNECTED</span></p>
+
+<div class="box">
+<h3>1. Image Analysis (Accurate Count)</h3>
+<input type="file" id="imgFile" accept="image/*">
+<button onclick="analyzeImg()">Analyze Image</button>
+<div id="result">
+<h2 id="count" style="color:#00ff88">Count: --</h2>
+<p id="status" style="color:orange">Status: --</p>
+<img id="outImg" style="display:none">
+</div>
+</div>
+
+<div class="box">
+<h3>2. Video Analysis</h3>
+<input type="file" id="vidFile" accept="video/*">
+<button onclick="analyzeVid()">Analyze Video</button>
+<h3 id="vidCount">Max Count: --</h3>
+</div>
+
+<script>
+async function analyzeImg(){
+ const f=document.getElementById('imgFile').files[0];
+ if(!f){alert("Image select kar");return;}
+ document.getElementById('count').innerText="Analyzing...";
+ const fd=new FormData(); fd.append('file',f);
+ const res=await fetch('http://127.0.0.1:8000/api/analyze-image',{method:'POST',body:fd});
+ const data=await res.json();
+ document.getElementById('count').innerText="Count: "+(data.count?? data.people_count);
+ document.getElementById('status').innerText="Status: "+data.status;
+ if(data.border_image){
+  const img=document.getElementById('outImg');
+  img.src="data:image/jpeg;base64,"+data.border_image;
+  img.style.display="block";
+ }
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>)
-</script></body></html>
+async function analyzeVid(){
+ const f=document.getElementById('vidFile').files[0];
+ if(!f){alert("Video select kar");return;}
+ document.getElementById('vidCount').innerText="Analyzing video...";
+ const fd=new FormData(); fd.append('file',f);
+ const res=await fetch('http://127.0.0.1:8000/api/analyze-video',{method:'POST',body:fd});
+ const data=await res.json();
+ document.getElementById('vidCount').innerText="Max Count: "+(data.count?? data.people_count);
+}
+</script>
+</body>
+</html>
