@@ -1,62 +1,29 @@
 <!DOCTYPE html>
-<html>
-<head>
-<title>Jansuraksha AI</title>
-<style>
-body{background:#0a0a0a;color:white;font-family:sans-serif;padding:20px}
-.box{background:#1a1a1a;border:1px solid #333;padding:20px;border-radius:12px;margin-bottom:20px}
-button{background:#00ff88;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer}
-#result{margin-top:15px}
-img{max-width:100%;border:2px solid #00ff88;margin-top:10px;border-radius:8px}
-</style>
-</head>
-<body>
+<html><head><meta charset="UTF-8"><title>JANSURAKSHA AI</title>
+<style>body{background:#0f0f0f;color:#fff;font-family:Arial;padding:20px}
+.card{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:20px;margin-bottom:20px}
+.btn{background:#00ff88;color:#000;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer}
+.btn2{background:#00aaff;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer}
+.g{color:#00ff88;font-size:20px;font-weight:bold}.b{color:#00aaff;font-size:20px;font-weight:bold}</style>
+</head><body>
 <h1>🛡️ JANSURAKSHA AI - Border CCTV</h1>
 <p>Backend: <span style="color:#00ff88">http://127.0.0.1:8000 - CONNECTED</span></p>
 
-<div class="box">
-<h3>1. Image Analysis (Accurate Count)</h3>
-<input type="file" id="imgFile" accept="image/*">
-<button onclick="analyzeImg()">Analyze Image</button>
-<div id="result">
-<h2 id="count" style="color:#00ff88">Count: --</h2>
-<p id="status" style="color:orange">Status: --</p>
-<img id="outImg" style="display:none">
-</div>
-</div>
+<div class="card"><h3>1. Image Analysis</h3>
+<input type="file" id="i1" accept="image/*"><button class="btn" onclick="a1()">Analyze Image</button>
+<p class="g" id="c1">Count: --</p><p class="b" id="v1">Vehicle: --</p><p id="s1">Status: --</p><p id="b1"></p></div>
 
-<div class="box">
-<h3>2. Video Analysis</h3>
-<input type="file" id="vidFile" accept="video/*">
-<button onclick="analyzeVid()">Analyze Video</button>
-<h3 id="vidCount">Max Count: --</h3>
-</div>
+<div class="card"><h3>2. Video Analysis</h3>
+<input type="file" id="i2" accept="video/*"><button class="btn" onclick="a2()">Analyze Video</button>
+<p class="g" id="c2">Max Count: --</p><p class="b" id="v2">Max Vehicle: --</p><p id="b2"></p></div>
+
+<div class="card" style="border-color:#00aaff"><h3>3. Vehicle Analysis (Exact Count)</h3>
+<input type="file" id="i3" accept="image/*,video/*"><button class="btn2" onclick="a3()">Analyze Vehicle</button>
+<p class="b" id="c3">Vehicle Count: --</p><p id="b3"></p><p id="t3"></p></div>
 
 <script>
-async function analyzeImg(){
- const f=document.getElementById('imgFile').files[0];
- if(!f){alert("Image select kar");return;}
- document.getElementById('count').innerText="Analyzing...";
- const fd=new FormData(); fd.append('file',f);
- const res=await fetch('http://127.0.0.1:8000/api/analyze-image',{method:'POST',body:fd});
- const data=await res.json();
- document.getElementById('count').innerText="Count: "+(data.count?? data.people_count);
- document.getElementById('status').innerText="Status: "+data.status;
- if(data.border_image){
-  const img=document.getElementById('outImg');
-  img.src="data:image/jpeg;base64,"+data.border_image;
-  img.style.display="block";
- }
-}
-async function analyzeVid(){
- const f=document.getElementById('vidFile').files[0];
- if(!f){alert("Video select kar");return;}
- document.getElementById('vidCount').innerText="Analyzing video...";
- const fd=new FormData(); fd.append('file',f);
- const res=await fetch('http://127.0.0.1:8000/api/analyze-video',{method:'POST',body:fd});
- const data=await res.json();
- document.getElementById('vidCount').innerText="Max Count: "+(data.count?? data.people_count);
-}
-</script>
-</body>
-</html>
+const API="http://127.0.0.1:8000";
+async function a1(){let f=document.getElementById("i1").files[0];if(!f)return alert("file chuno");let d=new FormData();d.append("file",f);let r=await fetch(API+"/api/analyze-image",{method:"POST",body:d});let j=await r.json();document.getElementById("c1").innerText="Count: "+j.crowd_count;document.getElementById("v1").innerText="Vehicle: "+j.vehicle_count;document.getElementById("s1").innerText="Status: "+j.status;document.getElementById("b1").innerText="Breakdown: "+JSON.stringify(j.vehicle_breakdown)}
+async function a2(){let f=document.getElementById("i2").files[0];let d=new FormData();d.append("file",f);let r=await fetch(API+"/api/analyze-video",{method:"POST",body:d});let j=await r.json();document.getElementById("c2").innerText="Max Count: "+j.max_crowd_count;document.getElementById("v2").innerText="Max Vehicle: "+j.max_vehicle_count;document.getElementById("b2").innerText=JSON.stringify(j.last_frame_analysis)}
+async function a3(){let f=document.getElementById("i3").files[0];let d=new FormData();d.append("file",f);let e=f.type.includes("video")?"/api/analyze-video":"/api/analyze-image";let r=await fetch(API+e,{method:"POST",body:d});let j=await r.json();let vc=j.vehicle_count??j.max_vehicle_count;let cc=j.crowd_count??j.max_crowd_count;let bd=j.vehicle_breakdown??j.last_frame_analysis?.vehicle_breakdown;document.getElementById("c3").innerText="Vehicle Count: "+vc;document.getElementById("b3").innerText="Exact: "+JSON.stringify(bd)+" | Crowd: "+cc;document.getElementById("t3").innerText="Total: "+(vc+cc)}
+</script></body></html>

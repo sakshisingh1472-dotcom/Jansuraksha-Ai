@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import detections
 
-app = FastAPI()
+app = FastAPI(title="Jansuraksha AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,5 +15,5 @@ app.add_middleware(
 app.include_router(detections.router, prefix="/api")
 
 @app.get("/")
-def home():
-    return {"message": "Jansuraksha AI Running"}
+def root():
+    return {"status":"connected","backend":"http://127.0.0.1:8000"}
