@@ -5,25 +5,29 @@ from ultralytics import YOLO
 import tempfile
 
 st.set_page_config(page_title="Jansuraksha AI - Precision Analytics Engine", page_icon="🛡️", layout="wide")
-st.title("🛡️ Jansuraksha AI - Ultra Precision Analytics Engine")
+st.title("🛡️ Jansuraksha AI - Precision Analytics Engine")
 
 @st.cache_resource
 def load_detection_model():
-    # High-accuracy YOLO weights setup
-    return YOLO("yolov8m.pt")  # Auto-downloads medium precision model for better accuracy
+    return YOLO("yolov8m.pt")
 
 try:
     model = load_detection_model()
 except Exception:
     model = YOLO("yolov8n.pt")
 
+if 'bg_subtractor' not in st.session_state:
+    st.session_state.bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=25, detectShadows=False)
+
 st.sidebar.header("🕹️ Source Selection")
 source_mode = st.sidebar.radio("Input Type:", ["Image Upload", "Live CCTV / Webcam", "Video Upload"])
 
-st.sidebar.header("⚙️ Precision Tuning")
-base_conf = st.sidebar.slider("Detection Sensitivity (Confidence)", 0.05, 0.80, 0.12)
+st.sidebar.header("⚙️ Precision & Motion Tuning")
+base_conf = st.sidebar.slider("Detection Sensitivity (Confidence)", 0.05, 0.80, 0.15)
 iou_thresh = st.sidebar.slider("Overlap Filtering (IoU Threshold)", 0.10, 0.70, 0.45)
-is_dense_crowd = st.sidebar.checkbox("🔥 High-Density Slicing (For Heavy Crowds)", value=False)
+is_dense_crowd = st.sidebar.checkbox("🔥 High-Density Patch Mode (For Dense Crowds)", value=True)
+filter_motion_only = st.sidebar.checkbox("⚡ Motion-Only Filter (Ignore Stationary/Static)", value=False)
+motion_thresh = st.sidebar.slider("Motion Sensitivity Threshold", 5, 50, 15)
 
 st.sidebar.header("🚨 Detection Targets")
 detect_people = st.sidebar.checkbox("Detect People", value=True)
@@ -37,7 +41,15 @@ CLASS_NAMES = {
     7: "Truck"
 }
 
-def process_frame(frame):
+def check_motion(fg_mask, box):
+    x1, y1, x2, y2 = box
+    roi_mask = fg_mask[y1:y2, x1:x2]
+    if roi_mask.size == 0:
+        return True
+    motion_ratio = (np.count_nonzero(roi_mask) / float(roi_mask.size)) * 100
+    return motion_ratio >= motion_thresh
+
+def process_frame(frame, fg_mask=None):
     h, w, _ = frame.shape
     crowd_count = 0
     vehicle_breakdown = {"Car": 0, "Motorcycle": 0, "Bus": 0, "Truck": 0}
@@ -45,7 +57,7 @@ def process_frame(frame):
     boxes_to_draw = []
 
     if is_dense_crowd and detect_people:
-        grid_rows, grid_cols = 2, 2
+        grid_rows, grid_cols = 3, 3
         cell_h, cell_w = h // grid_rows, w // grid_cols
         detected_centers = []
 
@@ -65,6 +77,10 @@ def process_frame(frame):
                         full_x1, full_y1 = x1 + sx1, y1 + sy1
                         full_x2, full_y2 = x2 + sx1, y2 + sy1
                         cx, cy = (full_x1 + full_x2) // 2, (full_y1 + full_y2) // 2
+
+                        if filter_motion_only and fg_mask is not None:
+                            if not check_motion(fg_mask, (full_x1, full_y1, full_x2, full_y2)):
+                                continue
 
                         is_duplicate = False
                         for (dcx, dcy) in detected_centers:
@@ -88,6 +104,10 @@ def process_frame(frame):
             for box in results[0].boxes:
                 cls_id = int(box.cls[0])
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                if filter_motion_only and fg_mask is not None:
+                    if not check_motion(fg_mask, (x1, y1, x2, y2)):
+                        continue
 
                 if cls_id == 0 and detect_people:
                     crowd_count += 1
@@ -120,7 +140,12 @@ with col_display:
         if uploaded_file is not None:
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
             frame = cv2.imdecode(file_bytes, 1)
-            processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame)
+            
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            blur = cv2.GaussianBlur(gray, (5, 5), 0)
+            _, motion_mask = cv2.threshold(blur, 50, 255, cv2.THRESH_BINARY)
+            
+            processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame, fg_mask=motion_mask)
             
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_container_width=True)
             metric_crowd.metric("👥 Total Crowd Count", p_cnt)
@@ -139,7 +164,10 @@ with col_display:
                 ret, frame = cap.read()
                 if not ret:
                     break
-                processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame)
+                
+                fg_mask = st.session_state.bg_subtractor.apply(frame)
+                processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame, fg_mask=fg_mask)
+                
                 st_frame.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_container_width=True)
                 metric_crowd.metric("👥 Total Crowd Count", p_cnt)
                 metric_vehicle.metric("🚘 Total Vehicles Detected", v_cnt)
@@ -159,7 +187,10 @@ with col_display:
                 if not ret:
                     st.error("Camera Feed Offline.")
                     break
-                processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame)
+                
+                fg_mask = st.session_state.bg_subtractor.apply(frame)
+                processed_img, p_cnt, v_cnt, v_breakdown = process_frame(frame, fg_mask=fg_mask)
+                
                 st_frame.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB), use_container_width=True)
                 metric_crowd.metric("👥 Total Crowd Count", p_cnt)
                 metric_vehicle.metric("🚘 Total Vehicles Detected", v_cnt)
